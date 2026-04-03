@@ -17,22 +17,34 @@ body {
   padding: 20px;
 }
 
-header {
+.header {
   text-align: center;
-  background: rgba(255,255,255,0.95);
-  padding: 30px 20px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  padding: 24px 20px;
   border-radius: 20px;
   margin-bottom: 30px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
 }
 
-header h1 {
-  font-size: 2.5rem;
-  background: linear-gradient(45deg, #667eea, #764ba2);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 10px;
+.header h1 {
+  font-size: 2rem;
+  color: white;
+  margin-bottom: 6px;
+}
+
+.header p {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+}
+
+.header button {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.4);
+  padding: 6px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
 }
 
 main {
@@ -48,12 +60,6 @@ main {
   padding: 30px;
   border-radius: 20px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-}
-
-.inventory-form h2 {
-  margin-bottom: 25px;
-  color: #333;
-  text-align: center;
 }
 
 .form-grid {
@@ -200,31 +206,21 @@ main {
 .footer {
   text-align: center;
   padding: 30px 20px;
-  color: #6b7280;
-  background: rgba(255,255,255,0.9);
+  color: white;
   margin-top: 40px;
   border-radius: 20px;
 }
 
-.footer code {
-  background: #e5e7eb;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 14px;
-  color: #374151;
-}
-
 @media (max-width: 768px) {
-  .main {
+  main {
     grid-template-columns: 1fr;
     gap: 20px;
-    padding: 0 10px;
   }
-  
-  header h1 {
-    font-size: 2rem;
+
+  .header h1 {
+    font-size: 1.5rem;
   }
-  
+
   .form-grid {
     grid-template-columns: 1fr 1fr;
   }
