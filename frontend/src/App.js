@@ -7,7 +7,7 @@ import Dashboard from './pages/Dashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
-const API_BASE_URL = 'https://expert-parakeet-q7r7xrqww9p6c4jw4-8000.app.github.dev'
+const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app'
 
 function MainApp() {
   const { user, logout, token } = useAuth()

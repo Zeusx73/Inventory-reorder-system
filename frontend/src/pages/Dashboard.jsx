@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 
-const API_BASE_URL = 'https://expert-parakeet-q7r7xrqww9p6c4jw4-8000.app.github.dev'
+const API_BASE_URL ='https://inventory-reorder-system-production.up.railway.app'
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b']
 
 function Dashboard() {

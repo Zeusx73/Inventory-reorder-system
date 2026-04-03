@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const API_BASE_URL = 'https://expert-parakeet-q7r7xrqww9p6c4jw4-8000.app.github.dev'
+const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app'
 
 function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' })
