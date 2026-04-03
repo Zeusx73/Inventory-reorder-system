@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 
-const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app'
+const API_BASE_URL = 'https://inventory-reorder-system-production-bb97.up.railway.app'
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b']
 
 function Dashboard() {

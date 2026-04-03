@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app'
+const API_BASE_URL = 'https://inventory-reorder-system-production-bb97.up.railway.app'
 
 function SignupPage() {
   const [formData, setFormData] = useState({
