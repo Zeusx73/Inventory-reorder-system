@@ -1,8 +1,0 @@
-langgraph
-langgraph.checkpoint.postgres
-python-dotenv
-langchain_groq
-pydantic
-fastapi
-psycopg2-binary
-
