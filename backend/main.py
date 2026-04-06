@@ -98,3 +98,10 @@ def invoke_graph(request: InvokeRequest, current_user: dict = Depends(get_curren
         result=result.get("result", ""),
         reasoning=result.get("reasoning", "")
     )
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    # Railway provides a port automatically, we must use it
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
