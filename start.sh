@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Navigate to backend
-cd backend
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-# Install dependencies (Railway does this, but this ensures they're ready)
-pip install -r requirements.txt
+# Use python3 to ensure the correct environment is called
+echo "Starting application..."
+python3 main.py
 
-# Start FastAPI with Uvicorn
-# We use 0.0.0.0 and the $PORT variable so Railway can see the app
-python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
