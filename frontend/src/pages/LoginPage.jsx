@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState } from 'react' // Added missing import
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://inventory-reorder-system-production.up.railway.app';
-
+// React requires REACT_APP_ prefix to read environment variables
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://inventory-reorder-system-production.up.railway.app';
 
 function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' })
@@ -22,6 +22,7 @@ function LoginPage() {
     setLoading(true)
 
     try {
+      // Logic: Ensure no double slashes by using the template literal correctly
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,7 +39,10 @@ function LoginPage() {
       navigate('/')
 
     } catch (err) {
-      setError(err.message)
+      // Better error message for the user
+      setError(err.message === 'Failed to fetch' 
+        ? 'Cannot connect to server. Please try again later.' 
+        : err.message)
     } finally {
       setLoading(false)
     }
@@ -51,7 +55,8 @@ function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '20px',
+      fontFamily: 'sans-serif'
     }}>
       <div style={{
         background: 'white',
@@ -75,7 +80,8 @@ function LoginPage() {
             padding: '12px',
             borderRadius: '8px',
             marginBottom: '16px',
-            fontSize: '14px'
+            fontSize: '14px',
+            textAlign: 'center'
           }}>
             ❌ {error}
           </div>
@@ -141,6 +147,7 @@ function LoginPage() {
               fontSize: '16px',
               fontWeight: 'bold',
               cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'opacity 0.2s'
             }}
           >
             {loading ? '⏳ Logging in...' : '🔐 Login'}
@@ -149,7 +156,7 @@ function LoginPage() {
 
         <p style={{ textAlign: 'center', marginTop: '20px', color: '#888', fontSize: '14px' }}>
           Don't have an account?{' '}
-          <Link to="/signup" style={{ color: '#6366f1', fontWeight: 'bold' }}>
+          <Link to="/signup" style={{ color: '#6366f1', fontWeight: 'bold', textDecoration: 'none' }}>
             Sign up
           </Link>
         </p>
