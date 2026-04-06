@@ -2,8 +2,9 @@ import { useState } from 'react' // Added missing import
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// React requires REACT_APP_ prefix to read environment variables
+// Hardcode the URL directly to bypass variable issues
 const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app';
+
 
 
 function LoginPage() {
