@@ -1,19 +1,11 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
-
-# Database
 psycopg2-binary
 python-dotenv
-
-# Authentication
 python-jose[cryptography]
 passlib[bcrypt]
-
-# AI and Graph Logic
 langchain-groq
 langgraph
 pydantic
-
-# Services
 resend
