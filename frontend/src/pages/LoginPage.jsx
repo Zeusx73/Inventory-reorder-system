@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 // React requires REACT_APP_ prefix to read environment variables
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://inventory-reorder-system-production.up.railway.app';
+const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app';
+
 
 function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' })
