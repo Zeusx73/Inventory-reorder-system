@@ -53,7 +53,7 @@ function MainApp() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token ? token.trim() : ''}`
         },
         body: JSON.stringify({
           ...formData,
