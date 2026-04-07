@@ -10,3 +10,4 @@ langgraph
 pydantic
 resend
 email-validator
+bcrypt==4.0.1
