@@ -3,12 +3,9 @@ from typing import TypedDict
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 
-# Same LLM setup as before — pulled out of main script
 llm = ChatGroq(model="llama-3.3-70b-versatile",
                api_key=os.getenv("GROQ_API_KEY"))
-        
 
-        # Same State definition — nothing changes here
 class State(TypedDict):
     task: str
     item: str
@@ -25,98 +22,153 @@ class State(TypedDict):
     result: str
     reasoning: str
 
-                                                            # Same node functions — unchanged
-                                                    
+def score_suppliers(suppliers: list[dict]) -> list[dict]:
+    """Real supplier scoring algorithm with weighted criteria."""
+    reliability_map = {
+        "Very High": 100,
+        "High": 75,
+        "Medium": 50,
+        "Low": 25
+    }
+
+    # Find min/max for normalization
+    prices = [s.get("price_per_unit", 0) for s in suppliers]
+    times = [s.get("delivery_time", 0) for s in suppliers]
+    min_price, max_price = min(prices), max(prices)
+    min_time, max_time = min(times), max(times)
+
+    scored = []
+    for s in suppliers:
+        # Price score: lower price = higher score (40% weight)
+        if max_price == min_price:
+            price_score = 100
+        else:
+            price_score = (1 - (s["price_per_unit"] - min_price) / (max_price - min_price)) * 100
+
+        # Reliability score (35% weight)
+        reliability_score = reliability_map.get(s.get("reliability", "Medium"), 50)
+
+        # Delivery time score: faster = higher score (25% weight)
+        if max_time == min_time:
+            time_score = 100
+        else:
+            time_score = (1 - (s["delivery_time"] - min_time) / (max_time - min_time)) * 100
+
+        # Weighted total score
+        total_score = (price_score * 0.40) + (reliability_score * 0.35) + (time_score * 0.25)
+
+        scored.append({
+            **s,
+            "price_score": round(price_score, 1),
+            "reliability_score": round(reliability_score, 1),
+            "time_score": round(time_score, 1),
+            "total_score": round(total_score, 1)
+        })
+
+    # Sort by total score descending
+    return sorted(scored, key=lambda x: x["total_score"], reverse=True)
+
 def calculate_reorder(state: State):
-    prompt = f"""
-    You are an inventory management expert.
+    prompt = f"""You are an inventory management expert.
 
-    Analyze this inventory situation:
-    - Item: {state['item']}
-    - Current Stock: {state['stock']} units
-    - Minimum Stock Required: {state['mini_stock']} units
-    - Daily Sales: {state['daily_sales']} units/day
-    - Supplier Lead Time: {state['lead_time']} days
+Analyze this inventory situation:
+- Item: {state['item']}
+- Current Stock: {state['stock']} units
+- Minimum Stock Required: {state['mini_stock']} units
+- Daily Sales: {state['daily_sales']} units/day
+- Supplier Lead Time: {state['lead_time']} days
 
-    Calculate:
-    1. How many units need to be reordered RIGHT NOW
-    2. How many days until stockout if we don't reorder
-    3. Is this situation URGENT or NORMAL?
+Calculate:
+1. How many units need to be reordered RIGHT NOW
+2. How many days until stockout if we don't reorder
+3. Is this situation URGENT or NORMAL?
 
-    Give a clear analysis in 3-4 sentences.
-    End your response with exactly this line:
-    REORDER_QUANTITY: <number>"""
-                                                                    
+Give a clear analysis in 3-4 sentences.
+End your response with exactly this line:
+REORDER_QUANTITY: <number>"""
 
     response = llm.invoke(prompt)
     content = response.content
 
-                                                                                # Extract reorder quantity from LLM response
     reorder_quantity = max(0, state["mini_stock"] - state["stock"])
     for line in content.split("\n"):
         if "REORDER_QUANTITY:" in line:
             try:
                 reorder_quantity = int(line.split(":")[1].strip())
-            except:pass
+            except: pass
 
     return {"reorder_quantity": reorder_quantity,
             "reasoning": content,
             "message": content}
-                                                                                                                                                                                        
 
 def select_supplier(state: State):
-    prompt = f"""
-    You are a procurement expert making a supplier selection decision.
-    Inventory Situation:
-    - Item: {state['item']}
-    - Units to Reorder: {state['reorder_quantity']}
-    -Current Stock: {state['stock']} units
-    -Daily Sales: {state['daily_sales']} units/day
-    - Lead Time Available: {state['lead_time']} days
+    # Score suppliers using algorithm first
+    scored_suppliers = score_suppliers(state["supplier_options"])
+    best_supplier = scored_suppliers[0]
 
-    Available Suppliers:
-                                                                                                                                                                                                                                {state['supplier_options']}
+    # Build scoring summary for LLM context
+    scoring_summary = "\n".join([
+        f"- {s['name']}: Total Score={s['total_score']}/100 "
+        f"(Price={s['price_score']}, Reliability={s['reliability_score']}, Speed={s['time_score']})"
+        for s in scored_suppliers
+    ])
 
-                                                                                                                                                                                                                                    Analyze each supplier and decide:
-                                                                                                                                                                                                                                        1. Which supplier is the BEST choice and why?
-                                                                                                                                                                                                                                            2. What are the risks of each supplier?
-                                                                                                                                                                                                                                                3. Is this order URGENT?
+    prompt = f"""You are a procurement expert making a supplier selection decision.
+Inventory Situation:
+- Item: {state['item']}
+- Units to Reorder: {state['reorder_quantity']}
+- Current Stock: {state['stock']} units
+- Daily Sales: {state['daily_sales']} units/day
+- Lead Time Available: {state['lead_time']} days
 
-                                                                                                                                                                                                                                                    Give a professional procurement recommendation in 4-5 sentences.
-                                                                                                                                                                                                                                                        End your response with exactly this line:
-                                                                                                                                                                                                                                                            SELECTED_SUPPLIER: <supplier name>
-                                                                                                                                                                                                                                                                """
+Algorithmic Scoring Results (weighted: Price 40%, Reliability 35%, Speed 25%):
+{scoring_summary}
+
+Top Recommended Supplier: {best_supplier['name']} (Score: {best_supplier['total_score']}/100)
+
+Confirm this selection and explain WHY this supplier scored highest.
+Mention the risks of each other supplier.
+Give a professional procurement recommendation in 4-5 sentences.
+
+End your response with exactly this line:
+SELECTED_SUPPLIER: {best_supplier['name']}"""
 
     response = llm.invoke(prompt)
     content = response.content
 
-                                                                                                                                                                                                                                                                            # Extract supplier name from LLM response
-    selected = state["supplier_options"][0]["name"]
+    selected = best_supplier["name"]
     for line in content.split("\n"):
-            if "SELECTED_SUPPLIER:" in line:
-                selected = line.split(":")[1].strip()
-                break
+        if "SELECTED_SUPPLIER:" in line:
+            selected = line.split(":")[1].strip()
+            break
 
     return {"selected_supplier": selected,
-            "supplier_scores": state["supplier_options"],
+            "supplier_scores": scored_suppliers,
             "approval_status": "pending",
             "message": content,
             "result": content}
 
-
 def generate_final_report(state: State):
-    prompt = f"""
-    you are a senior supply chain manager writing an executive summary.
+    # Build score table
+    scores_text = ""
+    if state.get("supplier_scores"):
+        scores_text = "\nSupplier Scores:\n" + "\n".join([
+            f"- {s['name']}: {s['total_score']}/100"
+            for s in state["supplier_scores"]
+        ])
 
-    Decision Made:
-    - Item: {state['item']}
-    - Reorder Quantity: {state['reorder_quantity']} units
-    - Selected Supplier: {state['selected_supplier']}
-    - Current Stock: {state['stock']} units
-    - Minimum Stock: {state['mini_stock']} units
+    prompt = f"""You are a senior supply chain manager writing an executive summary.
 
-    Write a brief executive summary (3-4 sentences) of this reorder decision
-    that a business owner would understand. Include the key risk if we do NOT act."""
+Decision Made:
+- Item: {state['item']}
+- Reorder Quantity: {state['reorder_quantity']} units
+- Selected Supplier: {state['selected_supplier']}
+- Current Stock: {state['stock']} units
+- Minimum Stock: {state['mini_stock']} units
+{scores_text}
+
+Write a brief executive summary (3-4 sentences) of this reorder decision
+that a business owner would understand. Include the key risk if we do NOT act."""
 
     response = llm.invoke(prompt)
 
@@ -136,14 +188,3 @@ def build_graph(checkpointer):
     builder.add_edge("generate_final_report", END)
 
     return builder.compile(checkpointer=checkpointer)
-
-
-                            
-                                                
-                                        
-                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                    
