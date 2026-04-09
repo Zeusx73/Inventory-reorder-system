@@ -5,7 +5,7 @@ from database import get_checkpointer
 from graph import build_graph
 from auth_routes import router as auth_router
 from user_model import init_users_table
-from history_model import init_history_table, save_order_history, get_order_history, get_supplier_stats
+from history_model import init_history_table, save_order_history, get_order_history, get_supplier_stats, approve_order, reject_order
 from email_service import send_low_stock_alert, should_send_alert
 from auth import get_current_user
 from inventory_model import init_inventory_table, add_inventory_item, get_inventory, delete_inventory_item, update_inventory_item
@@ -93,6 +93,25 @@ async def bulk_upload(file: UploadFile = File(...), current_user: dict = Depends
         count += 1
     return {"message": f"{count} items uploaded"}
 
+@app.post("/orders/{order_id}/approve")
+def approve_order_route(order_id: int, current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("sub")
+    order = approve_order(order_id, user_email)
+    return order
+
+@app.post("/orders/{order_id}/reject")
+def reject_order_route(order_id: int, body: dict, current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("sub")
+    reason = body.get("reason", "No reason provided")
+    order = reject_order(order_id, user_email, reason)
+    return order
+
+@app.get("/orders/pending")
+def get_pending_orders(current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("sub")
+    history = get_order_history(user_email)
+    return [o for o in history if o.get("approval_status") == "pending"]
+
 @app.post("/invoke", response_model=InvokeResponse)
 def invoke_graph(request: InvokeRequest, current_user: dict = Depends(get_current_user)):
     config = {"configurable": {"thread_id": request.thread_id}}
@@ -123,8 +142,9 @@ def invoke_graph(request: InvokeRequest, current_user: dict = Depends(get_curren
         mini_stock=request.mini_stock,
         reorder_quantity=result.get("reorder_quantity", 0),
         selected_supplier=result.get("selected_supplier", ""),
-        approval_status=result.get("approval_status", ""),
-        user_email=user_email
+        approval_status=result.get("approval_status", "pending"),
+        user_email=user_email,
+        supplier_scores=result.get("supplier_scores", [])
     )
 
     if should_send_alert(request.stock, request.mini_stock):
