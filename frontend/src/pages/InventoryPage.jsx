@@ -17,6 +17,7 @@ export default function InventoryPage() {
     lead_time: '', mini_stock: '', unit_cost: ''
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchItems(); }, []);
 
   const fetchItems = async () => {
