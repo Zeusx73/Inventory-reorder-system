@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import Dashboard from './pages/Dashboard'
+import InventoryPage from './pages/InventoryPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
@@ -12,6 +13,7 @@ const API_BASE_URL = 'https://inventory-reorder-system-production-ef47.up.railwa
 function MainApp() {
   const { user, logout, token } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [formData, setFormData] = useState({
     thread_id: `thread_${Date.now()}`,
     item: '',
@@ -24,6 +26,20 @@ function MainApp() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (location.state?.item) {
+      const item = location.state.item
+      setFormData(prev => ({
+        ...prev,
+        item: item.item_name,
+        stock: item.current_stock,
+        daily_sales: item.daily_sales,
+        lead_time: item.lead_time,
+        mini_stock: item.mini_stock
+      }))
+    }
+  }, [location.state])
 
   const sampleSuppliers = [
     { name: 'Supplier A', price_per_unit: 10, delivery_time: 3, reliability: 'High' },
@@ -90,6 +106,20 @@ function MainApp() {
           <span style={{ color: 'white', fontSize: '14px' }}>
             👋 Welcome, {user?.full_name}
           </span>
+          <button
+            onClick={() => navigate('/inventory')}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.4)',
+              padding: '6px 16px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+          >
+            📦 Inventory
+          </button>
           <button
             onClick={() => navigate('/dashboard')}
             style={{
@@ -239,6 +269,11 @@ function App() {
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/inventory" element={
+            <ProtectedRoute>
+              <InventoryPage />
             </ProtectedRoute>
           } />
           <Route path="/" element={
