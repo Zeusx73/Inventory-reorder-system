@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 // Hardcode the URL directly to bypass variable issues
-const API_BASE_URL = 'https://inventory-reorder-system-production.up.railway.app';
+const API_BASE_URL = 'https://inventory-reorder-system-production-ef47.up.railway.app';
 
 
 
