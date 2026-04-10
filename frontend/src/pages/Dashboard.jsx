@@ -21,7 +21,7 @@ function Dashboard() {
   const [actionMsg, setActionMsg] = useState('')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     fetchData()
   }, [])
 
