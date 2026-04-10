@@ -21,24 +21,23 @@ function Dashboard() {
   const [actionMsg, setActionMsg] = useState('')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-useEffect(() => {
-  fetchData()
-}, [])
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   async function fetchData() {
     try {
       const headers = { 'Authorization': `Bearer ${token?.trim()}` }
-      const [historyRes, statsRes, pendingRes] = await Promise.all([
+      const [historyRes, statsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/history`, { headers }),
-        fetch(`${API_BASE_URL}/supplier-stats`, { headers }),
-        fetch(`${API_BASE_URL}/orders/pending`, { headers })
+        fetch(`${API_BASE_URL}/supplier-stats`, { headers })
       ])
       const historyData = await historyRes.json()
       const statsData = await statsRes.json()
-      const pendingData = await pendingRes.json()
-      setHistory(historyData.reverse())
+      const reversed = historyData.reverse()
+      setHistory(reversed)
       setSupplierStats(statsData)
-      setPendingOrders(pendingData)
+      setPendingOrders(reversed.filter(o => o.approval_status === 'pending'))
     } catch (err) {
       console.error('Failed to fetch data:', err)
     } finally {
@@ -146,7 +145,7 @@ useEffect(() => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
             <p style={{ color: '#6b7280', margin: 0, fontSize: '13px' }}>Total Orders</p>
-            <p style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: 'bold' }}>{history.length}</p>
+            <p style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: 'bold', color: '#6366f1' }}>{history.length}</p>
           </div>
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
             <p style={{ color: '#6b7280', margin: 0, fontSize: '13px' }}>Suppliers Used</p>
@@ -169,13 +168,13 @@ useEffect(() => {
         {/* Pending Approvals Section */}
         {pendingOrders.length > 0 && (
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-            <h3 style={{ color: '#374151', margin: '0 0 16px' }}>⏳ Pending Approvals</h3>
+            <h3 style={{ color: '#374151', margin: '0 0 16px' }}>⏳ Pending Approvals ({pendingOrders.length})</h3>
             {pendingOrders.map(order => (
               <div key={order.id} style={{
                 border: '1px solid #fde68a', borderRadius: '12px',
                 padding: '16px', marginBottom: '12px', background: '#fffbeb'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px' }}>{order.item}</p>
                     <p style={{ margin: '4px 0', color: '#6b7280', fontSize: '13px' }}>
@@ -187,7 +186,7 @@ useEffect(() => {
                       {new Date(order.created_at).toLocaleString()}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => handleApprove(order.id)} style={{
                       background: '#22c55e', color: 'white', border: 'none',
                       padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
@@ -280,7 +279,7 @@ useEffect(() => {
         <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
           <h3 style={{ color: '#374151', margin: '0 0 20px' }}>📋 Recent Orders</h3>
           {history.length > 0 ? (
-            history.slice(-5).reverse().map((h, i) => (
+            history.slice(0, 5).map((h, i) => (
               <div key={i} style={{
                 display: 'flex', justifyContent: 'space-between',
                 alignItems: 'center', padding: '12px 0',
