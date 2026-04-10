@@ -86,6 +86,67 @@ function Dashboard() {
     }
   }
 
+  const generatePDF = (order) => {
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Purchase Order - ${order.item}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+            .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; }
+            .header h1 { margin: 0; font-size: 28px; }
+            .header p { margin: 5px 0 0; opacity: 0.8; }
+            .po-number { font-size: 14px; margin-top: 10px; opacity: 0.9; }
+            .section { background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+            .section h3 { margin: 0 0 15px; color: #6366f1; font-size: 16px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+            .field { margin-bottom: 10px; }
+            .field label { font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px; }
+            .field value { font-size: 16px; font-weight: bold; color: #111; }
+            .status-approved { display: inline-block; background: #dcfce7; color: #16a34a; padding: 6px 16px; border-radius: 20px; font-weight: bold; }
+            .status-pending { display: inline-block; background: #fef9c3; color: #92400e; padding: 6px 16px; border-radius: 20px; font-weight: bold; }
+            .footer { text-align: center; margin-top: 40px; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+            @media print { body { padding: 20px; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>🛒 Purchase Order</h1>
+            <p>Inventory Reorder System — AI Powered</p>
+            <p class="po-number">PO-${order.id}-${Date.now().toString().slice(-6)}</p>
+          </div>
+          <div class="section">
+            <h3>📦 Order Details</h3>
+            <div class="grid">
+              <div class="field"><label>Item Name</label><value>${order.item}</value></div>
+              <div class="field"><label>Selected Supplier</label><value>${order.selected_supplier}</value></div>
+              <div class="field"><label>Reorder Quantity</label><value>${order.reorder_quantity} units</value></div>
+              <div class="field"><label>Current Stock</label><value>${order.stock} units</value></div>
+              <div class="field"><label>Minimum Stock</label><value>${order.mini_stock} units</value></div>
+              <div class="field"><label>Order Status</label><value><span class="status-${order.approval_status}">${order.approval_status?.toUpperCase()}</span></value></div>
+            </div>
+          </div>
+          <div class="section">
+            <h3>📅 Timeline</h3>
+            <div class="grid">
+              <div class="field"><label>Order Created</label><value>${new Date(order.created_at).toLocaleString()}</value></div>
+              <div class="field"><label>Approved By</label><value>${order.approved_by || 'Pending'}</value></div>
+              <div class="field"><label>Approved At</label><value>${order.approved_at ? new Date(order.approved_at).toLocaleString() : 'Pending'}</value></div>
+              <div class="field"><label>Generated At</label><value>${new Date().toLocaleString()}</value></div>
+            </div>
+          </div>
+          <div class="footer">
+            <p>This is an AI-generated purchase order from Inventory Reorder System</p>
+            <p>Powered by LangGraph + FastAPI + React</p>
+          </div>
+          <script>window.onload = () => { window.print(); }</script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
   const stockData = history.slice(0, 10).map(h => ({
     name: h.item,
     stock: h.stock,
@@ -185,7 +246,7 @@ function Dashboard() {
                       {new Date(order.created_at).toLocaleString()}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button onClick={() => handleApprove(order.id)} style={{
                       background: '#22c55e', color: 'white', border: 'none',
                       padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
@@ -196,6 +257,11 @@ function Dashboard() {
                       padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
                       fontWeight: 'bold', fontSize: '13px'
                     }}>❌ Reject</button>
+                    <button onClick={() => generatePDF(order)} style={{
+                      background: '#6366f1', color: 'white', border: 'none',
+                      padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                      fontWeight: 'bold', fontSize: '13px'
+                    }}>📄 PDF</button>
                   </div>
                 </div>
               </div>
@@ -268,7 +334,7 @@ function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p style={{ color: '#9ca3af', textAlign: 'center' }}>No data yet — run some analyses first!</p>
+            <p style={{ color: '#9ca3af', textAlign: 'center' }}>No data yet!</p>
           )}
         </div>
 
@@ -298,6 +364,12 @@ function Dashboard() {
                   }}>
                     {h.approval_status}
                   </span>
+                  <br />
+                  <button onClick={() => generatePDF(h)} style={{
+                    background: '#6366f1', color: 'white', border: 'none',
+                    padding: '3px 10px', borderRadius: '6px', cursor: 'pointer',
+                    fontSize: '11px', marginTop: '4px'
+                  }}>📄 PDF</button>
                 </div>
               </div>
             ))
