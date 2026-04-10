@@ -20,9 +20,6 @@ function Dashboard() {
   const [rejectReason, setRejectReason] = useState('')
   const [actionMsg, setActionMsg] = useState('')
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
-  // eslint-disable-next-line
   }, [])
 
   async function fetchData() {
