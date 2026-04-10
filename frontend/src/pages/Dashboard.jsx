@@ -22,7 +22,7 @@ function Dashboard() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
-    fetchData()
+  // eslint-disable-next-line
   }, [])
 
   async function fetchData() {
