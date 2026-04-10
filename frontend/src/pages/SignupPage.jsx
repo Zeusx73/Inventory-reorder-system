@@ -53,7 +53,7 @@ function SignupPage() {
         throw new Error(data.detail || 'Registration failed')
       }
 
-      login({ email: data.email, full_name: data.full_name }, data.access_token)
+      login({ email: data.email, full_name: data.full_name, role: data.role || 'viewer' }, data.access_token)
       navigate('/')
 
     } catch (err) {

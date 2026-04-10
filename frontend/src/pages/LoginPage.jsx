@@ -1,11 +1,8 @@
-import { useState } from 'react' // Added missing import
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// Hardcode the URL directly to bypass variable issues
 const API_BASE_URL = 'https://inventory-reorder-system-production-ef47.up.railway.app';
-
-
 
 function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' })
@@ -24,7 +21,6 @@ function LoginPage() {
     setLoading(true)
 
     try {
-      // Logic: Ensure no double slashes by using the template literal correctly
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,13 +33,12 @@ function LoginPage() {
         throw new Error(data.detail || 'Login failed')
       }
 
-      login({ email: data.email, full_name: data.full_name }, data.access_token)
+      login({ email: data.email, full_name: data.full_name, role: data.role || 'viewer' }, data.access_token)
       navigate('/')
 
     } catch (err) {
-      // Better error message for the user
-      setError(err.message === 'Failed to fetch' 
-        ? 'Cannot connect to server. Please try again later.' 
+      setError(err.message === 'Failed to fetch'
+        ? 'Cannot connect to server. Please try again later.'
         : err.message)
     } finally {
       setLoading(false)

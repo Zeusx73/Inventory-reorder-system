@@ -10,7 +10,7 @@ const API_BASE_URL = 'https://inventory-reorder-system-production-ef47.up.railwa
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b']
 
 function Dashboard() {
-  const { user, logout, token } = useAuth()
+  const { user, logout, token, role } = useAuth()
   const navigate = useNavigate()
   const [history, setHistory] = useState([])
   const [supplierStats, setSupplierStats] = useState([])
@@ -179,6 +179,9 @@ function Dashboard() {
           <h1 style={{ color: 'white', margin: 0, fontSize: '20px' }}>📊 Dashboard</h1>
           <p style={{ color: 'rgba(255,255,255,0.7)', margin: '4px 0 0', fontSize: '13px' }}>
             Welcome, {user?.full_name}
+            <span style={{ background: 'rgba(255,255,255,0.2)', color: 'white', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', marginLeft: '8px' }}>
+              {role?.toUpperCase()}
+            </span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -247,16 +250,20 @@ function Dashboard() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button onClick={() => handleApprove(order.id)} style={{
-                      background: '#22c55e', color: 'white', border: 'none',
-                      padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
-                      fontWeight: 'bold', fontSize: '13px'
-                    }}>✅ Approve</button>
-                    <button onClick={() => setRejectModal(order.id)} style={{
-                      background: '#ef4444', color: 'white', border: 'none',
-                      padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
-                      fontWeight: 'bold', fontSize: '13px'
-                    }}>❌ Reject</button>
+                    {(role === 'admin' || role === 'manager') && (
+                      <>
+                        <button onClick={() => handleApprove(order.id)} style={{
+                          background: '#22c55e', color: 'white', border: 'none',
+                          padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                          fontWeight: 'bold', fontSize: '13px'
+                        }}>✅ Approve</button>
+                        <button onClick={() => setRejectModal(order.id)} style={{
+                          background: '#ef4444', color: 'white', border: 'none',
+                          padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                          fontWeight: 'bold', fontSize: '13px'
+                        }}>❌ Reject</button>
+                      </>
+                    )}
                     <button onClick={() => generatePDF(order)} style={{
                       background: '#6366f1', color: 'white', border: 'none',
                       padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
