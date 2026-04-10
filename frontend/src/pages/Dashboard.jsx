@@ -26,6 +26,7 @@ function Dashboard() {
   }, [])
 
   async function fetchData() {
+    if (!token) { setLoading(false); return; }
     try {
       const headers = { 'Authorization': `Bearer ${token?.trim()}` }
       const [historyRes, statsRes] = await Promise.all([
