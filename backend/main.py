@@ -49,6 +49,25 @@ def supplier_stats(current_user: dict = Depends(get_current_user)):
     user_email = current_user.get("sub")
     return get_supplier_stats(user_email)
 
+@app.get("/orders/pending")
+def get_pending_orders(current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("sub")
+    history = get_order_history(user_email)
+    return [o for o in history if o.get("approval_status") == "pending"]
+
+@app.post("/orders/{order_id}/approve")
+def approve_order_route(order_id: int, current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("sub")
+    order = approve_order(order_id, user_email)
+    return order
+
+@app.post("/orders/{order_id}/reject")
+def reject_order_route(order_id: int, body: dict, current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("sub")
+    reason = body.get("reason", "No reason provided")
+    order = reject_order(order_id, user_email, reason)
+    return order
+
 @app.get("/inventory")
 def get_inventory_items(current_user: dict = Depends(get_current_user)):
     user_email = current_user.get("sub")
@@ -92,25 +111,6 @@ async def bulk_upload(file: UploadFile = File(...), current_user: dict = Depends
         )
         count += 1
     return {"message": f"{count} items uploaded"}
-
-@app.post("/orders/{order_id}/approve")
-def approve_order_route(order_id: int, current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    order = approve_order(order_id, user_email)
-    return order
-
-@app.post("/orders/{order_id}/reject")
-def reject_order_route(order_id: int, body: dict, current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    reason = body.get("reason", "No reason provided")
-    order = reject_order(order_id, user_email, reason)
-    return order
-
-@app.get("/orders/pending")
-def get_pending_orders(current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    history = get_order_history(user_email)
-    return [o for o in history if o.get("approval_status") == "pending"]
 
 @app.post("/invoke", response_model=InvokeResponse)
 def invoke_graph(request: InvokeRequest, current_user: dict = Depends(get_current_user)):
