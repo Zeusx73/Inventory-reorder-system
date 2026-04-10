@@ -20,10 +20,15 @@ function Dashboard() {
   const [rejectReason, setRejectReason] = useState('')
   const [actionMsg, setActionMsg] = useState('')
 
-  }, [])
+  useEffect(() => {
+    if (token) {
+      fetchData()
+    } else {
+      setLoading(false)
+    }
+  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchData() {
-    if (!token) { setLoading(false); return; }
     try {
       const headers = { 'Authorization': `Bearer ${token?.trim()}` }
       const [historyRes, statsRes] = await Promise.all([
@@ -81,7 +86,7 @@ function Dashboard() {
     }
   }
 
-  const stockData = history.slice(-10).map(h => ({
+  const stockData = history.slice(0, 10).map(h => ({
     name: h.item,
     stock: h.stock,
     minimum: h.mini_stock,
@@ -102,7 +107,6 @@ function Dashboard() {
 
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh' }}>
-      {/* Header */}
       <div style={{
         background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
         padding: '20px 24px',
@@ -132,14 +136,12 @@ function Dashboard() {
 
       <div style={{ padding: '20px' }}>
 
-        {/* Action message */}
         {actionMsg && (
           <div style={{ background: '#e8f5e9', color: '#2e7d32', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontWeight: 'bold' }}>
             {actionMsg}
           </div>
         )}
 
-        {/* Stats Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
             <p style={{ color: '#6b7280', margin: 0, fontSize: '13px' }}>Total Orders</p>
@@ -163,7 +165,6 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Pending Approvals Section */}
         {pendingOrders.length > 0 && (
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
             <h3 style={{ color: '#374151', margin: '0 0 16px' }}>⏳ Pending Approvals ({pendingOrders.length})</h3>
@@ -202,7 +203,6 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Reject Modal */}
         {rejectModal && (
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -231,7 +231,6 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Charts */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
           <h3 style={{ color: '#374151', margin: '0 0 20px' }}>📦 Stock vs Reorder Levels</h3>
           <ResponsiveContainer width="100%" height={250}>
@@ -273,7 +272,6 @@ function Dashboard() {
           )}
         </div>
 
-        {/* Recent Orders */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
           <h3 style={{ color: '#374151', margin: '0 0 20px' }}>📋 Recent Orders</h3>
           {history.length > 0 ? (
