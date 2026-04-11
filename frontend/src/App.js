@@ -17,10 +17,10 @@ function MainApp() {
   const [formData, setFormData] = useState({
     thread_id: `thread_${Date.now()}`,
     item: '',
-    stock: 0,
-    daily_sales: 0,
-    lead_time: 0,
-    mini_stock: 0,
+    stock: "",
+    daily_sales: "",
+    lead_time: "",
+    mini_stock: "",
     supplier_options: []
   })
   const [result, setResult] = useState(null)
