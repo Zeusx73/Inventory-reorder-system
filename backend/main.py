@@ -9,8 +9,8 @@ from auth import get_current_user
 from auth_routes import router as auth_router
 from schemas import InvokeRequest, InvokeResponse
 from graph import build_graph
-
 from history_model import (
+    init_history_table,
     save_order_history,
     get_order_history,
     approve_order,
@@ -18,7 +18,7 @@ from history_model import (
 )
 from inventory_model import (
     init_inventory_table,
-    get_all_inventory,
+    get_inventory,
     add_inventory_item,
     delete_inventory_item,
     update_inventory_item
@@ -94,7 +94,6 @@ def invoke(request: InvokeRequest, user: dict = Depends(get_current_user)):
 
     result = graph.invoke(initial_state, config=config)
 
-    # Save to DB
     save_order_history(
         item=result["item"],
         stock=result["stock"],
@@ -142,25 +141,34 @@ def reject(order_id: int, reason: dict = {}, user: dict = Depends(get_current_us
 # INVENTORY
 # =========================
 @app.get("/inventory")
-def get_inventory(user: dict = Depends(get_current_user)):
-    return get_all_inventory(user_email=user.get("sub"))
+def get_inventory_items(user: dict = Depends(get_current_user)):
+    return get_inventory(user_email=user.get("sub"))
 
 @app.post("/inventory")
 def add_item(item: dict, user: dict = Depends(get_current_user)):
-    item["user_email"] = user.get("sub")
-    return add_inventory_item(item)
+    return add_inventory_item(
+        user_email=user.get("sub"),
+        item_name=item["item_name"],
+        current_stock=item["current_stock"],
+        daily_sales=item["daily_sales"],
+        lead_time=item["lead_time"],
+        mini_stock=item["mini_stock"],
+        unit_cost=item.get("unit_cost", 0)
+    )
 
 @app.put("/inventory/{item_id}")
 def update_item(item_id: int, item: dict, user: dict = Depends(get_current_user)):
-    return update_inventory_item(item_id, item)
+    update_inventory_item(item_id, user.get("sub"), **item)
+    return {"message": "Updated"}
 
 @app.delete("/inventory/{item_id}")
 def delete_item(item_id: int, user: dict = Depends(get_current_user)):
-    return delete_inventory_item(item_id)
+    delete_inventory_item(item_id, user.get("sub"))
+    return {"message": "Deleted"}
 
 # =========================
 # RUN
 # =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port
