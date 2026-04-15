@@ -24,8 +24,7 @@ app = FastAPI(title="Inventory AI System")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change later in production
-    allow_credentials=True,
+    allow_origins=["*"],  # change later in production,
     allow_methods=["*"],
     allow_headers=["*"],
 )
