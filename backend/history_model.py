@@ -26,6 +26,7 @@ def init_history_table():
             approved_by VARCHAR(255),
             approved_at TIMESTAMP,
             rejection_reason TEXT,
+            override_reason TEXT,
             supplier_scores JSONB,
             created_at TIMESTAMP DEFAULT NOW()
         )
@@ -36,6 +37,7 @@ def init_history_table():
         ("approved_by", "VARCHAR(255)"),
         ("approved_at", "TIMESTAMP"),
         ("rejection_reason", "TEXT"),
+        ("override_reason", "TEXT"),
         ("supplier_scores", "JSONB"),
     ]:
         cur.execute(f"""
@@ -118,6 +120,28 @@ def reject_order(order_id: int, approved_by: str, reason: str):
     conn.close()
     return row
 
+def override_order(order_id, new_supplier, new_quantity, override_reason, overridden_by):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE order_history
+            SET selected_supplier = %s,
+                reorder_quantity = %s,
+                approval_status = 'overridden',
+                override_reason = %s,
+                approved_by = %s,
+                approved_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            RETURNING *
+        """, (new_supplier, new_quantity, override_reason, overridden_by, order_id))
+        conn.commit()
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_supplier_stats(user_email: str = None):
     conn = get_connection()
     cur = conn.cursor()
@@ -138,3 +162,15 @@ def get_supplier_stats(user_email: str = None):
     cur.close()
     conn.close()
     return rows
+
+def migrate_add_override_columns():
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("ALTER TABLE order_history ADD COLUMN IF NOT EXISTS override_reason TEXT")
+        conn.commit()
+    except Exception:
+        pass 
+    finally:
+        cursor.close()
+        conn.close()

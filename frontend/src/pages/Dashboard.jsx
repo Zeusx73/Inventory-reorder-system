@@ -9,6 +9,8 @@ import {
 const API_BASE_URL = 'https://inventory-reorder-system-production-ef47.up.railway.app'
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b']
 
+const SUPPLIERS = ['Supplier A', 'Supplier B', 'Supplier C']
+
 function Dashboard() {
   const { user, logout, token, role } = useAuth()
   const navigate = useNavigate()
@@ -19,6 +21,13 @@ function Dashboard() {
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [actionMsg, setActionMsg] = useState('')
+
+  // Override modal state
+  const [overrideModal, setOverrideModal] = useState(null)
+  const [overrideSupplier, setOverrideSupplier] = useState('')
+  const [overrideQuantity, setOverrideQuantity] = useState('')
+  const [overrideReason, setOverrideReason] = useState('')
+  const [overrideLoading, setOverrideLoading] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -32,7 +41,7 @@ function Dashboard() {
     try {
       const headers = { 'Authorization': `Bearer ${token?.trim()}` }
       const [historyRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/history`, { headers }),
+        fetch(`${API_BASE_URL}/orders`, { headers }),
         fetch(`${API_BASE_URL}/supplier-stats`, { headers })
       ])
       const historyData = await historyRes.json()
@@ -86,6 +95,48 @@ function Dashboard() {
     }
   }
 
+  // ── NEW: Handle Override ──
+  const openOverrideModal = (order) => {
+    setOverrideModal(order)
+    setOverrideSupplier(order.selected_supplier)
+    setOverrideQuantity(order.reorder_quantity)
+    setOverrideReason('')
+  }
+
+  const handleOverride = async () => {
+    if (!overrideSupplier || !overrideQuantity) {
+      setActionMsg('⚠️ Please fill all override fields')
+      return
+    }
+    setOverrideLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders/${overrideModal.id}/override`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token?.trim()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          new_supplier: overrideSupplier,
+          new_quantity: parseInt(overrideQuantity),
+          override_reason: overrideReason || 'No reason provided'
+        })
+      })
+      if (res.ok) {
+        setActionMsg('✏️ Order overridden successfully!')
+        setOverrideModal(null)
+        fetchData()
+        setTimeout(() => setActionMsg(''), 3000)
+      } else {
+        setActionMsg('❌ Override failed')
+      }
+    } catch (err) {
+      setActionMsg('❌ Override failed')
+    } finally {
+      setOverrideLoading(false)
+    }
+  }
+
   const generatePDF = (order) => {
     const printWindow = window.open('', '_blank')
     printWindow.document.write(`
@@ -106,6 +157,7 @@ function Dashboard() {
             .field value { font-size: 16px; font-weight: bold; color: #111; }
             .status-approved { display: inline-block; background: #dcfce7; color: #16a34a; padding: 6px 16px; border-radius: 20px; font-weight: bold; }
             .status-pending { display: inline-block; background: #fef9c3; color: #92400e; padding: 6px 16px; border-radius: 20px; font-weight: bold; }
+            .status-overridden { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 6px 16px; border-radius: 20px; font-weight: bold; }
             .footer { text-align: center; margin-top: 40px; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
             @media print { body { padding: 20px; } }
           </style>
@@ -125,6 +177,7 @@ function Dashboard() {
               <div class="field"><label>Current Stock</label><value>${order.stock} units</value></div>
               <div class="field"><label>Minimum Stock</label><value>${order.mini_stock} units</value></div>
               <div class="field"><label>Order Status</label><value><span class="status-${order.approval_status}">${order.approval_status?.toUpperCase()}</span></value></div>
+              ${order.override_reason ? `<div class="field"><label>Override Reason</label><value>${order.override_reason}</value></div>` : ''}
             </div>
           </div>
           <div class="section">
@@ -206,6 +259,7 @@ function Dashboard() {
           </div>
         )}
 
+        {/* Stats Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
             <p style={{ color: '#6b7280', margin: 0, fontSize: '13px' }}>Total Orders</p>
@@ -229,6 +283,7 @@ function Dashboard() {
           </div>
         </div>
 
+        {/* Pending Orders */}
         {pendingOrders.length > 0 && (
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
             <h3 style={{ color: '#374151', margin: '0 0 16px' }}>⏳ Pending Approvals ({pendingOrders.length})</h3>
@@ -262,6 +317,12 @@ function Dashboard() {
                           padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
                           fontWeight: 'bold', fontSize: '13px'
                         }}>❌ Reject</button>
+                        {/* ── NEW Override Button ── */}
+                        <button onClick={() => openOverrideModal(order)} style={{
+                          background: '#f59e0b', color: 'white', border: 'none',
+                          padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                          fontWeight: 'bold', fontSize: '13px'
+                        }}>✏️ Override</button>
                       </>
                     )}
                     <button onClick={() => generatePDF(order)} style={{
@@ -276,6 +337,7 @@ function Dashboard() {
           </div>
         )}
 
+        {/* Reject Modal */}
         {rejectModal && (
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -304,6 +366,75 @@ function Dashboard() {
           </div>
         )}
 
+        {/* ── NEW Override Modal ── */}
+        {overrideModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}>
+            <div style={{ background: 'white', borderRadius: '16px', padding: '24px', width: '320px' }}>
+              <h3 style={{ margin: '0 0 4px', color: '#374151' }}>✏️ Manual Override</h3>
+              <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#9ca3af' }}>
+                Overriding AI decision for <strong>{overrideModal.item}</strong>
+              </p>
+
+              <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                New Supplier
+              </label>
+              <select
+                value={overrideSupplier}
+                onChange={e => setOverrideSupplier(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', boxSizing: 'border-box' }}
+              >
+                {SUPPLIERS.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                New Quantity (units)
+              </label>
+              <input
+                type="number"
+                value={overrideQuantity}
+                onChange={e => setOverrideQuantity(e.target.value)}
+                min="1"
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', boxSizing: 'border-box' }}
+              />
+
+              <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                Reason for Override
+              </label>
+              <textarea
+                placeholder="e.g. Lead time drifted, switching supplier..."
+                value={overrideReason}
+                onChange={e => setOverrideReason(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', height: '80px', boxSizing: 'border-box', marginBottom: '16px' }}
+              />
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={handleOverride}
+                  disabled={overrideLoading}
+                  style={{
+                    background: '#f59e0b', color: 'white', border: 'none',
+                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', flex: 1,
+                    fontWeight: 'bold', opacity: overrideLoading ? 0.7 : 1
+                  }}
+                >
+                  {overrideLoading ? 'Saving...' : 'Confirm Override'}
+                </button>
+                <button onClick={() => setOverrideModal(null)} style={{
+                  background: '#eee', border: 'none',
+                  padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', flex: 1
+                }}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Charts */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
           <h3 style={{ color: '#374151', margin: '0 0 20px' }}>📦 Stock vs Reorder Levels</h3>
           <ResponsiveContainer width="100%" height={250}>
@@ -345,6 +476,7 @@ function Dashboard() {
           )}
         </div>
 
+        {/* Recent Orders */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
           <h3 style={{ color: '#374151', margin: '0 0 20px' }}>📋 Recent Orders</h3>
           {history.length > 0 ? (
@@ -359,6 +491,11 @@ function Dashboard() {
                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#9ca3af' }}>
                     {h.selected_supplier} • {new Date(h.created_at).toLocaleDateString()}
                   </p>
+                  {h.override_reason && (
+                    <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#f59e0b' }}>
+                      ✏️ Overridden: {h.override_reason}
+                    </p>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ margin: 0, color: '#6366f1', fontWeight: 'bold' }}>
@@ -366,8 +503,14 @@ function Dashboard() {
                   </p>
                   <span style={{
                     fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                    background: h.approval_status === 'approved' ? '#dcfce7' : h.approval_status === 'rejected' ? '#fee2e2' : '#fef9c3',
-                    color: h.approval_status === 'approved' ? '#16a34a' : h.approval_status === 'rejected' ? '#dc2626' : '#92400e'
+                    background: h.approval_status === 'approved' ? '#dcfce7'
+                      : h.approval_status === 'rejected' ? '#fee2e2'
+                      : h.approval_status === 'overridden' ? '#e0e7ff'
+                      : '#fef9c3',
+                    color: h.approval_status === 'approved' ? '#16a34a'
+                      : h.approval_status === 'rejected' ? '#dc2626'
+                      : h.approval_status === 'overridden' ? '#4338ca'
+                      : '#92400e'
                   }}>
                     {h.approval_status}
                   </span>
