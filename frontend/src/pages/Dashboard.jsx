@@ -250,7 +250,7 @@ function Dashboard() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {(role === 'admin' || role === 'manager') && (
+                    {(role === 'admin' || role === 'manager' || role === 'viewer') && (
                       <>
                         <button onClick={() => handleApprove(order.id)} style={{
                           background: '#22c55e', color: 'white', border: 'none',

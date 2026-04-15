@@ -17,10 +17,17 @@ function MainApp() {
   const [formData, setFormData] = useState({
     thread_id: `thread_${Date.now()}`,
     item: '',
+<<<<<<< HEAD
     stock: "",
     daily_sales: "",
     lead_time: "",
     mini_stock: "",
+=======
+    stock: '',
+    daily_sales: '',
+    lead_time: '',
+    mini_stock: '',
+>>>>>>> 5a180c4 (feat: show approve/reject buttons for viewer role)
     supplier_options: []
   })
   const [result, setResult] = useState(null)
@@ -53,7 +60,7 @@ function MainApp() {
       ...prev,
       [name]: name.includes('stock') || name.includes('sales') ||
               name.includes('time') || name.includes('mini')
-              ? parseInt(value) || 0
+              ? value === '' ? '' : parseInt(value) || 0
               : value
     }))
   }
@@ -73,6 +80,10 @@ function MainApp() {
         },
         body: JSON.stringify({
           ...formData,
+          stock: parseInt(formData.stock) || 0,
+          daily_sales: parseInt(formData.daily_sales) || 0,
+          lead_time: parseInt(formData.lead_time) || 0,
+          mini_stock: parseInt(formData.mini_stock) || 0,
           supplier_options: sampleSuppliers
         }),
       })
@@ -174,6 +185,7 @@ function MainApp() {
                   name="stock"
                   value={formData.stock}
                   onChange={handleInputChange}
+                  placeholder="0"
                   min="0"
                 />
               </div>
@@ -184,6 +196,7 @@ function MainApp() {
                   name="daily_sales"
                   value={formData.daily_sales}
                   onChange={handleInputChange}
+                  placeholder="0"
                   min="0"
                 />
               </div>
@@ -194,6 +207,7 @@ function MainApp() {
                   name="lead_time"
                   value={formData.lead_time}
                   onChange={handleInputChange}
+                  placeholder="0"
                   min="0"
                 />
               </div>
@@ -204,6 +218,7 @@ function MainApp() {
                   name="mini_stock"
                   value={formData.mini_stock}
                   onChange={handleInputChange}
+                  placeholder="0"
                   min="0"
                 />
               </div>
