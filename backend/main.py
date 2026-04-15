@@ -9,7 +9,7 @@ from auth import get_current_user
 from auth_routes import router as auth_router
 from schemas import InvokeRequest, InvokeResponse
 from graph import build_graph
-from database import init_history_table
+
 from history_model import (
     save_order_history,
     get_order_history,
