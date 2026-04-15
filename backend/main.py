@@ -1,172 +1,179 @@
-from fastapi import FastAPI, Depends, File, UploadFile
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import InvokeRequest, InvokeResponse
-from database import get_checkpointer
-from graph import build_graph
-from auth_routes import router as auth_router
-from user_model import init_users_table
-from history_model import init_history_table, save_order_history, get_order_history, get_supplier_stats, approve_order, reject_order
-from email_service import send_low_stock_alert, should_send_alert
-from auth import get_current_user
-from inventory_model import init_inventory_table, add_inventory_item, get_inventory, delete_inventory_item, update_inventory_item
-import csv
-import io
+from pydantic import BaseModel
+import os, csv, io, uvicorn
+from dotenv import load_dotenv
+from groq import Groq
+from typing import List
 
-app = FastAPI(
-    title="Inventory Reorder API",
-    description="LangGraph powered supplier selection backend",
-    version="1.0.0"
-)
+# =========================
+# LOAD ENV
+# =========================
+load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise Exception("❌ GROQ_API_KEY missing in .env")
+
+client = Groq(api_key=GROQ_API_KEY)
+
+# =========================
+# FASTAPI INIT
+# =========================
+app = FastAPI(title="Inventory AI System")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://inventory-reorder-system-production-ef47.up.railway.app"],
-    allow_credentials=False,
+    allow_origins=["*"],  # change later in production
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
+# =========================
+# IN-MEMORY DATABASE (simple)
+# =========================
+inventory_db = []
+orders_db = []
+order_id_counter = 1
 
-@app.on_event("startup")
-async def startup():
-    init_users_table()
-    init_history_table()
-    init_inventory_table()
-    print("🚀 Inventory Reorder API is live!")
+# =========================
+# SCHEMAS
+# =========================
+class Supplier(BaseModel):
+    name: str
+    price: float
+    rating: float
+    delivery_days: int
+
+class InvokeRequest(BaseModel):
+    item: str
+    stock: int
+    daily_sales: float
+    lead_time: int
+    mini_stock: int
+    supplier_options: List[Supplier]
+
+# =========================
+# AI LOGIC (Groq)
+# =========================
+def call_ai(data):
+    prompt = f"""
+    You are an expert supply chain AI.
+
+    Item: {data['item']}
+    Current Stock: {data['stock']}
+    Daily Sales: {data['daily_sales']}
+    Lead Time: {data['lead_time']}
+    Minimum Stock: {data['mini_stock']}
+
+    Suppliers:
+    {data['supplier_options']}
+
+    Task:
+    1. Select best supplier
+    2. Calculate reorder quantity
+    3. Give reasoning
+
+    Return JSON:
+    selected_supplier, reorder_quantity, reasoning
+    """
+
+    response = client.chat.completions.create(
+        model="llama3-70b-8192",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+
+    return response.choices[0].message.content
+
+# =========================
+# ROUTES
+# =========================
 
 @app.get("/")
 def root():
     return {"status": "running"}
 
-@app.get("/history")
-def history(current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    return get_order_history(user_email)
-
-@app.get("/supplier-stats")
-def supplier_stats(current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    return get_supplier_stats(user_email)
-
-@app.get("/orders/pending")
-def get_pending_orders(current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    history = get_order_history(user_email)
-    return [o for o in history if o.get("approval_status") == "pending"]
-
-@app.post("/orders/{order_id}/approve")
-def approve_order_route(order_id: int, current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    order = approve_order(order_id, user_email)
-    return order
-
-@app.post("/orders/{order_id}/reject")
-def reject_order_route(order_id: int, body: dict, current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    reason = body.get("reason", "No reason provided")
-    order = reject_order(order_id, user_email, reason)
-    return order
-
+# -------- Inventory --------
 @app.get("/inventory")
-def get_inventory_items(current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    return get_inventory(user_email)
+def get_inventory():
+    return inventory_db
 
 @app.post("/inventory")
-def add_item(item: dict, current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    item_id = add_inventory_item(
-        user_email=user_email,
-        item_name=item["item_name"],
-        current_stock=item["current_stock"],
-        daily_sales=item["daily_sales"],
-        lead_time=item["lead_time"],
-        mini_stock=item["mini_stock"],
-        unit_cost=item.get("unit_cost", 0)
-    )
-    return {"id": item_id, "message": "Item added"}
+def add_inventory(item: dict):
+    inventory_db.append(item)
+    return {"message": "Item added"}
 
-@app.delete("/inventory/{item_id}")
-def delete_item(item_id: int, current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
-    delete_inventory_item(item_id, user_email)
-    return {"message": "Item deleted"}
+@app.delete("/inventory/{index}")
+def delete_inventory(index: int):
+    try:
+        inventory_db.pop(index)
+        return {"message": "Deleted"}
+    except:
+        raise HTTPException(404, "Item not found")
 
 @app.post("/inventory/bulk-upload")
-async def bulk_upload(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    user_email = current_user.get("sub")
+async def bulk_upload(file: UploadFile = File(...)):
     content = await file.read()
-    reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
+    reader = csv.DictReader(io.StringIO(content.decode()))
+    
     count = 0
     for row in reader:
-        add_inventory_item(
-            user_email=user_email,
-            item_name=row["item_name"],
-            current_stock=int(row["current_stock"]),
-            daily_sales=float(row["daily_sales"]),
-            lead_time=int(row["lead_time"]),
-            mini_stock=int(row["mini_stock"]),
-            unit_cost=float(row.get("unit_cost", 0))
-        )
+        inventory_db.append(row)
         count += 1
-    return {"message": f"{count} items uploaded"}
 
-@app.post("/invoke", response_model=InvokeResponse)
-def invoke_graph(request: InvokeRequest, current_user: dict = Depends(get_current_user)):
-    config = {"configurable": {"thread_id": request.thread_id}}
-    user_email = current_user.get("sub")
+    return {"uploaded": count}
 
-    suppliers = []
-    for s in request.supplier_options:
-        if isinstance(s, dict):
-            suppliers.append(s)
-        else:
-            suppliers.append(s.dict())
+# -------- Orders + AI --------
+@app.post("/invoke")
+def invoke_ai(request: InvokeRequest):
+    global order_id_counter
 
-    with get_checkpointer() as checkpointer:
-        graph_app = build_graph(checkpointer)
-        result = graph_app.invoke({
-            "task": "select best supplier",
-            "item": request.item,
-            "stock": request.stock,
-            "daily_sales": request.daily_sales,
-            "lead_time": request.lead_time,
-            "mini_stock": request.mini_stock,
-            "supplier_options": suppliers
-        }, config=config)
+    data = request.dict()
+    ai_result = call_ai(data)
 
-    save_order_history(
-        item=request.item,
-        stock=request.stock,
-        mini_stock=request.mini_stock,
-        reorder_quantity=result.get("reorder_quantity", 0),
-        selected_supplier=result.get("selected_supplier", ""),
-        approval_status=result.get("approval_status", "pending"),
-        user_email=user_email,
-        supplier_scores=result.get("supplier_scores", [])
-    )
+    # fallback simple logic (in case parsing fails)
+    reorder_qty = int(request.daily_sales * request.lead_time)
+    best_supplier = max(request.supplier_options, key=lambda s: s.rating).name
 
-    if should_send_alert(request.stock, request.mini_stock):
-        send_low_stock_alert(
-            item=request.item,
-            stock=request.stock,
-            reorder_quantity=result.get("reorder_quantity", 0),
-            selected_supplier=result.get("selected_supplier", "Unknown")
-        )
+    order = {
+        "id": order_id_counter,
+        "item": request.item,
+        "selected_supplier": best_supplier,
+        "reorder_quantity": reorder_qty,
+        "ai_response": ai_result,
+        "status": "pending"
+    }
 
-    return InvokeResponse(
-        thread_id=request.thread_id,
-        selected_supplier=result.get("selected_supplier", ""),
-        reorder_quantity=result.get("reorder_quantity", 0),
-        approval_status=result.get("approval_status", ""),
-        message=result.get("message", ""),
-        result=result.get("result", ""),
-        reasoning=result.get("reasoning", "")
-    )
+    orders_db.append(order)
+    order_id_counter += 1
 
+    return order
+
+@app.get("/orders")
+def get_orders():
+    return orders_db
+
+@app.post("/orders/{order_id}/approve")
+def approve(order_id: int):
+    for o in orders_db:
+        if o["id"] == order_id:
+            o["status"] = "approved"
+            return o
+    raise HTTPException(404, "Order not found")
+
+@app.post("/orders/{order_id}/reject")
+def reject(order_id: int):
+    for o in orders_db:
+        if o["id"] == order_id:
+            o["status"] = "rejected"
+            return o
+    raise HTTPException(404, "Order not found")
+
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
-    import uvicorn
-    import os
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
