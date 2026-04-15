@@ -34,7 +34,7 @@ app = FastAPI(title="🚀 Inventory Reorder API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "https://inventory-reorder-system-production-ef47.up.railway.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
