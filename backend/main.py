@@ -17,7 +17,9 @@ from history_model import (
     get_order_history,
     approve_order,
     reject_order,
-    override_order        # ← ADD this import to history_model.py too
+    override_order,
+    deliver_order,
+    get_drift_warnings
 )
 from inventory_model import (
     init_inventory_table,
@@ -30,9 +32,6 @@ from user_model import init_users_table
 
 load_dotenv()
 
-# =========================
-# APP INIT
-# =========================
 app = FastAPI(title="🚀 Inventory Reorder API")
 
 app.add_middleware(
@@ -43,20 +42,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =========================
-# ROUTERS
-# =========================
 app.include_router(auth_router)
 
-# =========================
-# LANGGRAPH SETUP
-# =========================
 checkpointer = MemorySaver()
 graph = build_graph(checkpointer)
 
-# =========================
-# STARTUP
-# =========================
 @app.on_event("startup")
 def startup():
     init_users_table()
@@ -64,20 +54,13 @@ def startup():
     init_inventory_table()
     print("🚀 Inventory Reorder API is live!")
 
-# =========================
-# HEALTH CHECK
-# =========================
 @app.get("/")
 def root():
     return {"status": "running", "message": "Inventory Reorder API is live!"}
 
-# =========================
-# INVOKE (AI Agent)
-# =========================
 @app.post("/invoke", response_model=InvokeResponse)
 def invoke(request: InvokeRequest, user: dict = Depends(get_current_user)):
     config = {"configurable": {"thread_id": request.thread_id}}
-
     initial_state = {
         "task": "analyze_inventory",
         "item": request.item,
@@ -94,9 +77,7 @@ def invoke(request: InvokeRequest, user: dict = Depends(get_current_user)):
         "result": "",
         "reasoning": ""
     }
-
     result = graph.invoke(initial_state, config=config)
-
     save_order_history(
         item=result["item"],
         stock=result["stock"],
@@ -105,9 +86,9 @@ def invoke(request: InvokeRequest, user: dict = Depends(get_current_user)):
         selected_supplier=result["selected_supplier"],
         approval_status="pending",
         user_email=user.get("sub"),
-        supplier_scores=result.get("supplier_scores", [])
+        supplier_scores=result.get("supplier_scores", []),
+        lead_time_days=request.lead_time   # ← saves lead time for drift calc
     )
-
     return InvokeResponse(
         thread_id=request.thread_id,
         selected_supplier=result["selected_supplier"],
@@ -118,9 +99,6 @@ def invoke(request: InvokeRequest, user: dict = Depends(get_current_user)):
         reasoning=result["reasoning"]
     )
 
-# =========================
-# ORDER HISTORY
-# =========================
 @app.get("/orders")
 def get_orders(user: dict = Depends(get_current_user)):
     return get_order_history(user_email=user.get("sub"))
@@ -140,9 +118,6 @@ def reject(order_id: int, reason: dict = {}, user: dict = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Order not found")
     return order
 
-# =========================
-# MANUAL OVERRIDE  ← NEW
-# =========================
 class OverrideRequest(BaseModel):
     new_supplier: str
     new_quantity: int
@@ -161,9 +136,18 @@ def override(order_id: int, body: OverrideRequest, user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Order not found")
     return order
 
-# =========================
-# INVENTORY
-# =========================
+# ── NEW: Deliver + Drift ──
+@app.post("/orders/{order_id}/deliver")
+def deliver(order_id: int, user: dict = Depends(get_current_user)):
+    order = deliver_order(order_id, delivered_by=user.get("sub"))
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+
+@app.get("/orders/drift-warnings")
+def drift_warnings(user: dict = Depends(get_current_user)):
+    return get_drift_warnings(user_email=user.get("sub"))
+
 @app.get("/inventory")
 def get_inventory_items(user: dict = Depends(get_current_user)):
     return get_inventory(user_email=user.get("sub"))
@@ -190,9 +174,6 @@ def delete_item(item_id: int, user: dict = Depends(get_current_user)):
     delete_inventory_item(item_id, user.get("sub"))
     return {"message": "Deleted"}
 
-# =========================
-# RUN
-# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)

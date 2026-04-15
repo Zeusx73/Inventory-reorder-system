@@ -28,6 +28,8 @@ def init_history_table():
             rejection_reason TEXT,
             override_reason TEXT,
             supplier_scores JSONB,
+            lead_time_days INTEGER,
+            delivered_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT NOW()
         )
     """)
@@ -39,6 +41,8 @@ def init_history_table():
         ("rejection_reason", "TEXT"),
         ("override_reason", "TEXT"),
         ("supplier_scores", "JSONB"),
+        ("lead_time_days", "INTEGER"),
+        ("delivered_at", "TIMESTAMP"),
     ]:
         cur.execute(f"""
             ALTER TABLE order_history
@@ -52,17 +56,20 @@ def init_history_table():
 def save_order_history(item: str, stock: int, mini_stock: int,
                        reorder_quantity: int, selected_supplier: str,
                        approval_status: str, user_email: str = None,
-                       supplier_scores: list = None):
+                       supplier_scores: list = None,
+                       lead_time_days: int = None):
     import json
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO order_history
-        (user_email, item, stock, mini_stock, reorder_quantity, selected_supplier, approval_status, supplier_scores)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        (user_email, item, stock, mini_stock, reorder_quantity, selected_supplier,
+         approval_status, supplier_scores, lead_time_days)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *
-    """, (user_email, item, stock, mini_stock, reorder_quantity, selected_supplier, approval_status,
-          json.dumps(supplier_scores) if supplier_scores else None))
+    """, (user_email, item, stock, mini_stock, reorder_quantity, selected_supplier,
+          approval_status, json.dumps(supplier_scores) if supplier_scores else None,
+          lead_time_days))
     row = dict(cur.fetchone())
     conn.commit()
     cur.close()
@@ -142,6 +149,104 @@ def override_order(order_id, new_supplier, new_quantity, override_reason, overri
         cursor.close()
         conn.close()
 
+# =========================
+# DELIVER ORDER + DRIFT
+# =========================
+def deliver_order(order_id: int, delivered_by: str):
+    conn = get_connection()
+    cur = conn.cursor()
+    # Get the order first to calculate drift
+    cur.execute("SELECT * FROM order_history WHERE id = %s", (order_id,))
+    order = cur.fetchone()
+    if not order:
+        cur.close()
+        conn.close()
+        return None
+
+    order = dict(order)
+
+    # Mark as delivered
+    cur.execute("""
+        UPDATE order_history
+        SET approval_status = 'delivered',
+            delivered_at = NOW()
+        WHERE id = %s
+        RETURNING *
+    """, (order_id,))
+    updated = dict(cur.fetchone())
+    conn.commit()
+
+    # Calculate drift
+    drift_info = None
+    if order.get("lead_time_days") and order.get("created_at"):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        created = order["created_at"]
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        actual_days = (now - created).days
+        expected_days = order["lead_time_days"]
+        if expected_days > 0:
+            drift_pct = ((actual_days - expected_days) / expected_days) * 100
+            drift_info = {
+                "expected_days": expected_days,
+                "actual_days": actual_days,
+                "drift_pct": round(drift_pct, 1)
+            }
+
+    cur.close()
+    conn.close()
+    updated["drift_info"] = drift_info
+    return updated
+
+def get_drift_warnings(user_email: str = None):
+    """Returns orders where actual delivery drifted more than 20% from expected."""
+    conn = get_connection()
+    cur = conn.cursor()
+    if user_email:
+        cur.execute("""
+            SELECT * FROM order_history
+            WHERE user_email = %s
+            AND approval_status = 'delivered'
+            AND lead_time_days IS NOT NULL
+            AND delivered_at IS NOT NULL
+            ORDER BY delivered_at DESC
+        """, (user_email,))
+    else:
+        cur.execute("""
+            SELECT * FROM order_history
+            WHERE approval_status = 'delivered'
+            AND lead_time_days IS NOT NULL
+            AND delivered_at IS NOT NULL
+            ORDER BY delivered_at DESC
+        """)
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+
+    warnings = []
+    from datetime import timezone
+    for row in rows:
+        created = row["created_at"]
+        delivered = row["delivered_at"]
+        if created and delivered:
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if delivered.tzinfo is None:
+                delivered = delivered.replace(tzinfo=timezone.utc)
+            actual_days = (delivered - created).days
+            expected_days = row["lead_time_days"]
+            if expected_days > 0:
+                drift_pct = ((actual_days - expected_days) / expected_days) * 100
+                if drift_pct > 20:
+                    warnings.append({
+                        **row,
+                        "actual_days": actual_days,
+                        "expected_days": expected_days,
+                        "drift_pct": round(drift_pct, 1)
+                    })
+    return warnings
+
 def get_supplier_stats(user_email: str = None):
     conn = get_connection()
     cur = conn.cursor()
@@ -170,7 +275,7 @@ def migrate_add_override_columns():
         cursor.execute("ALTER TABLE order_history ADD COLUMN IF NOT EXISTS override_reason TEXT")
         conn.commit()
     except Exception:
-        pass 
+        pass
     finally:
         cursor.close()
         conn.close()
